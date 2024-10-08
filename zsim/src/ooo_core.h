@@ -41,8 +41,8 @@
 class FilterCache;
 
 /* 2-level branch predictor:
- *  - L1: Branch history shift registers (bshr): 2^NB entries, HB bits of history/entry, indexed by XOR'd PC
- *  - L2: Pattern history table (pht): 2^LB entries, 2-bit sat counters, indexed by XOR'd bshr contents
+ *  - L1: Branch history shift registers (bhsr): 2^NB entries, HB bits of history/entry, indexed by XOR'd PC
+ *  - L2: Pattern history table (pht): 2^LB entries, 2-bit sat counters, indexed by XOR'd bhsr contents
  *  NOTE: Assumes LB is in [NB, HB] range for XORing (e.g., HB = 18 and NB = 10, LB = 13 is OK)
  */
 template<uint32_t NB, uint32_t HB, uint32_t LB>
@@ -50,7 +50,7 @@ class BranchPredictorPAg {
     private:
         uint32_t bhsr[1 << NB];
         uint8_t pht[1 << LB];
-        bool useA2; // Ture: use A2, else use A3
+        bool useA2; // True: use A2, else use A3
 
     public:
         BranchPredictorPAg() {
@@ -97,7 +97,45 @@ class BranchPredictorPAg {
                 pht[phtIdx] = taken? (pred? 3 : (pht[phtIdx]+1)) : (pred? (pht[phtIdx]-1) : 0); //2-bit saturating counter
             } else {
                 // Please implement Automaton 3 for update
-
+                //Glen's implementation below
+                //A3
+                if (taken == true)  
+                {
+                     if (pred == true)   //taken and correctly predicted (pht[phtIdx] = 2 or 3)
+                     {
+                          pht[phtIdx] = 3;
+                     }
+                     else             //taken but predicted not taken (pht[phtIdx] = 0 or 1)
+                     {
+                          if (pht[phtIdx] == 0)
+                          {
+                               pht[phtIdx] = 1;
+                          }
+                          else  // pht[phtIdx] = 1, jump to 3
+                          {
+                               pht[phtIdx] = 3;
+                          }	
+                     }
+                }
+                else   // not taken
+                {
+                     if (pred == true) //not taken but predicted taken (pht[phtIdx] = 2 or 3)
+                     {
+                          if (pht[phtIdx] == 3)
+                          {
+                               pht[phtIdx] = 2;
+                          }
+                          else // pht[phtIdx] = 2, jump to 0
+                          {
+                               pht[phtIdx] = 0;
+                          }
+                     }
+                     else	     //not taken and correctly predicted (pht[phtIdx] = 0 or 1)
+                     {
+                          pht[phtIdx] = 0;
+                     }
+                }
+		//Glen's implementation above
             }
             bhsr[bhsrIdx] = ((bhsr[bhsrIdx] << 1) & histMask ) | (taken? 1: 0); //we apply phtMask here, dependence is further away
 
